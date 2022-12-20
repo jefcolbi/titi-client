@@ -1,0 +1,12 @@
+[tool.black]
+line-length = 79
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+known_third_party = ["django", "django_stubs_ext", "drf_spectacular", "magic_notifier", "pytz", "rest_framework", "timezone_field", "traceback_with_variables"]
+line_length = 79
+
+[tool.autoflake]
+remove-all-unused-imports = true
