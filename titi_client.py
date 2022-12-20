@@ -8,23 +8,21 @@ import requests
 
 
 class LogWorker(Thread):
-
-    queue = Queue()
-    client = None
-    base_url = None
-    log_endpoint = None
-
-    def __init__(self):
+    def __init__(self, base_url, log_endpoint):
         super().__init__()
         self.daemon = True
+        self.queue = Queue()
+        self.client = requests.Session()
+        self.base_url = base_url
+        self.log_endpoint = log_endpoint
 
     def run(self) -> None:
         while True:
-            event = LogWorker.queue.get()
+            event = self.queue.get()
             for i in range(3):
                 try:
-                    LogWorker.client.post(
-                        f"{LogWorker.base_url}{LogWorker.log_endpoint}",
+                    self.client.post(
+                        f"{self.base_url}{self.log_endpoint}",
                         json=event,
                     )
                     # print(r.content)
@@ -72,14 +70,8 @@ class HttpHandler(logging.Handler):
         self.rgx_for_blocking.append(self.rgx_reset_log_url)
         self.rgx_for_blocking.append(self.rgx_start_log_url)
 
-        if not LogWorker.log_endpoint:
-            LogWorker.log_endpoint = self.log_endpoint
-        if not LogWorker.base_url:
-            LogWorker.base_url = self.base_url
-        if not LogWorker.client:
-            LogWorker.client = requests.Session()
-        worker = LogWorker()
-        worker.start()
+        self.worker = LogWorker(self.base_url, self.log_endpoint)
+        self.worker.start()
 
     def emit(self, record: logging.LogRecord):
         message = record.getMessage()
@@ -103,7 +95,7 @@ class HttpHandler(logging.Handler):
             "process_id": record.process,
             "process_name": record.processName,
         }
-        LogWorker.queue.put(data, block=False)
+        self.worker.queue.put(data, block=False)
 
     def get_identifier(self, record: logging.LogRecord):
         return self.identifier

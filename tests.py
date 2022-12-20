@@ -11,26 +11,24 @@ class TitiClient(unittest.TestCase):
     def create_logger(self, **kwargs):
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG)
-        for h in logger.handlers:
-            logger.removeHandler(h)
 
         hdlr = HttpHandler(**kwargs)
         hdlr.setLevel(logging.DEBUG)
         logger.addHandler(hdlr)
 
-        LogWorker.client.post = mock.MagicMock(name="post")
-        return logger
+        hdlr.worker.client.post = mock.MagicMock(name="post")
+        return logger, hdlr
 
     def test_simple(self):
         log_msg = "Let test"
-        logger = self.create_logger()
+        logger, hdlr = self.create_logger()
 
         logger.info(log_msg)
 
         time.sleep(1)
 
-        self.assertEqual(LogWorker.client.post.called, True)
-        passed_json = LogWorker.client.post.mock_calls[0].kwargs["json"]
+        self.assertEqual(hdlr.worker.client.post.called, True)
+        passed_json = hdlr.worker.client.post.mock_calls[0].kwargs["json"]
         self.assertEqual(log_msg, passed_json["message"])
         self.assertEqual("INFO", passed_json["level_name"])
 
@@ -39,7 +37,7 @@ class TitiClient(unittest.TestCase):
         proj_name = "Titi client"
         identifier = "zero"
         name = "tests"
-        logger = self.create_logger(
+        logger, hdlr = self.create_logger(
             project_name=proj_name, name=name, identifier=identifier
         )
 
@@ -47,8 +45,8 @@ class TitiClient(unittest.TestCase):
 
         time.sleep(1)
 
-        self.assertEqual(LogWorker.client.post.called, True)
-        passed_json = LogWorker.client.post.mock_calls[0].kwargs["json"]
+        self.assertEqual(hdlr.worker.client.post.called, True)
+        passed_json = hdlr.worker.client.post.mock_calls[0].kwargs["json"]
         # print(passed_json)
         self.assertEqual(log_msg, passed_json["message"])
         self.assertEqual("INFO", passed_json["level_name"])
@@ -102,14 +100,17 @@ class TitiClient(unittest.TestCase):
 
         logging.config.dictConfig(LOGGING_DICT)
         logger = logging.getLogger()
-        LogWorker.client.post = mock.MagicMock(name="post")
+        for hdlr in logger.handlers:
+            if isinstance(hdlr, HttpHandler):
+                break
+        hdlr.worker.client.post = mock.MagicMock(name="post")
 
         logger.info(log_msg)
 
         time.sleep(1)
 
-        self.assertEqual(LogWorker.client.post.called, True)
-        passed_json = LogWorker.client.post.mock_calls[0].kwargs["json"]
+        self.assertEqual(hdlr.worker.client.post.called, True)
+        passed_json = hdlr.worker.client.post.mock_calls[0].kwargs["json"]
         # print(passed_json)
         self.assertEqual(log_msg, passed_json["message"])
         self.assertEqual("INFO", passed_json["level_name"])
@@ -163,20 +164,23 @@ class TitiClient(unittest.TestCase):
 
         logging.config.dictConfig(LOGGING_DICT)
         logger = logging.getLogger()
-        LogWorker.client.post = mock.MagicMock(name="post")
+        for hdlr in logger.handlers:
+            if isinstance(hdlr, HttpHandler):
+                break
+        hdlr.worker.client.post = mock.MagicMock(name="post")
 
         logger.debug(log_msg)
 
         time.sleep(1)
 
-        self.assertEqual(LogWorker.client.post.called, False)
+        self.assertEqual(hdlr.worker.client.post.called, False)
 
     def test_server_url(self):
         log_msg = "Let test"
         LogWorker.base_url = None
         LogWorker.client = None
         LogWorker.log_endpoint = None
-        logger = self.create_logger(
+        logger, hdlr = self.create_logger(
             base_url="https://titi.synkio.se/", log_endpoint="/newapi/logs/"
         )
 
@@ -184,8 +188,8 @@ class TitiClient(unittest.TestCase):
 
         time.sleep(1)
 
-        self.assertEqual(LogWorker.client.post.called, True)
-        used_url = LogWorker.client.post.mock_calls[0].args[0]
+        self.assertEqual(hdlr.worker.client.post.called, True)
+        used_url = hdlr.worker.client.post.mock_calls[0].args[0]
         self.assertEqual(used_url, "https://titi.synkio.se/newapi/logs/")
 
 
