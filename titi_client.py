@@ -34,6 +34,8 @@ class LogWorker(Thread):
 
 
 class HttpHandler(logging.Handler):
+    rgx_for_blocking = []
+
     def __init__(
         self,
         base_url="http://localhost:8000",
@@ -57,11 +59,18 @@ class HttpHandler(logging.Handler):
         r = re.search(r"\/([a-zA-z:\d\.]+)", base_url)
         self.domain = r.group(1)
         self.rgx_full_log_url = re.compile(
-            f'{self.base_url} "POST {self.log_endpoint}'
+            f'{self.base_url}(\:\d+)? "POST {self.log_endpoint}'  # noqa: W605
         )
         self.rgx_start_log_url = re.compile(
             f"Starting new HTTP connection \(\d+\): {self.domain}"  # noqa: W605
         )
+        self.rgx_reset_log_url = re.compile(
+            f"Resetting dropped connection: {self.domain}"
+        )
+
+        self.rgx_for_blocking.append(self.rgx_full_log_url)
+        self.rgx_for_blocking.append(self.rgx_reset_log_url)
+        self.rgx_for_blocking.append(self.rgx_start_log_url)
 
         if not LogWorker.log_endpoint:
             LogWorker.log_endpoint = self.log_endpoint
@@ -74,11 +83,10 @@ class HttpHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord):
         message = record.getMessage()
-        if record.name == "urllib3.connectionpool" and (
-            self.rgx_full_log_url.search(message)
-            or self.rgx_start_log_url.search(message)
-        ):
-            return
+        if record.name == "urllib3.connectionpool":
+            for rgx in self.rgx_for_blocking:
+                if rgx.search(message):
+                    return
 
         data = {
             "level_name": record.levelname,
