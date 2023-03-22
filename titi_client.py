@@ -5,13 +5,18 @@ from queue import Queue
 from threading import Thread
 
 import requests
+from traceback_with_variables import format_exc
+
+logger = logging.getLogger()
 
 
 class LogWorker(Thread):
+    logger = logging.getLogger()
+
     def __init__(self, base_url, log_endpoint):
         super().__init__()
         self.daemon = True
-        self.queue = Queue()
+        self.queue = Queue(maxsize=0)
         self.client = requests.Session()
         self.base_url = base_url
         self.log_endpoint = log_endpoint
@@ -19,16 +24,16 @@ class LogWorker(Thread):
     def run(self) -> None:
         while True:
             event = self.queue.get()
+            self.queue.task_done()
             for i in range(3):
                 try:
                     self.client.post(
                         f"{self.base_url}{self.log_endpoint}",
                         json=event,
                     )
-                    # print(r.content)
+                    break
                 except Exception as e:
-                    print(e)
-                break
+                    logger.error(format_exc(e))
 
 
 class HttpHandler(logging.Handler):
@@ -74,28 +79,31 @@ class HttpHandler(logging.Handler):
         self.worker.start()
 
     def emit(self, record: logging.LogRecord):
-        message = record.getMessage()
-        if record.name == "urllib3.connectionpool":
-            for rgx in self.rgx_for_blocking:
-                if rgx.search(message):
-                    return
+        try:
+            message = record.getMessage()
+            if record.name.startswith("urllib3"):
+                for rgx in self.rgx_for_blocking:
+                    if rgx.search(message):
+                        return
 
-        data = {
-            "level_name": record.levelname,
-            "name": self.get_record_name(record),
-            "message": message,
-            "lineno": record.lineno,
-            "pathname": record.pathname,
-            "project_name": self.project_name,
-            "identifier": self.get_identifier(record),
-            "timestamp": record.created,
-            "datetime": str(datetime.fromtimestamp(record.created)),
-            "thread_id": record.thread,
-            "thread_name": record.threadName,
-            "process_id": record.process,
-            "process_name": record.processName,
-        }
-        self.worker.queue.put(data, block=False)
+            data = {
+                "level": record.levelname,
+                "name": self.get_record_name(record),
+                "message": message,
+                "lineno": record.lineno,
+                "pathname": record.pathname,
+                "project": self.project_name,
+                "identifier": self.get_identifier(record),
+                "timestamp": record.created,
+                "datetime": str(datetime.fromtimestamp(record.created)),
+                "thread_id": record.thread,
+                "thread_name": record.threadName,
+                "process_id": record.process,
+                "process_name": record.processName,
+            }
+            self.worker.queue.put(data, block=False)
+        except Exception as e:
+            logger.error(format_exc(e))
 
     def get_identifier(self, record: logging.LogRecord):
         return self.identifier
