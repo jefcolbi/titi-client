@@ -46,11 +46,13 @@ class HttpHandler(logging.Handler):
         project_name=None,
         name=None,
         identifier=None,
+        use_instance_name=False,
         **kwargs,
     ):
         super().__init__(*[], **kwargs)
 
         # customization
+        self.use_instance_name = use_instance_name
         self.project_name = project_name
         self.name = name
         self.identifier = identifier
@@ -109,7 +111,7 @@ class HttpHandler(logging.Handler):
         return self.identifier
 
     def get_record_name(self, record: logging.LogRecord):
-        if self.name:
+        if self.use_instance_name:
             return self.name
         else:
             return record.name

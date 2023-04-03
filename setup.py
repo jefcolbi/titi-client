@@ -18,7 +18,7 @@ URL = "https://github.com/jefcolbi/titi-client/"
 EMAIL = "jefcolbi@gmail.com"
 AUTHOR = "jefcolbi"
 REQUIRES_PYTHON = ">=3.6.0"
-VERSION = "0.0.2"
+VERSION = "0.0.3"
 
 # What packages are required for this module to be executed?
 REQUIRED = ["requests", "traceback-with-variables"]
